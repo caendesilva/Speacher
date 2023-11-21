@@ -1,0 +1,697 @@
+#!/usr/bin/env php
+<?php
+
+// Begin MinimaPHP
+
+/**
+ * This file is part of MinimaPHP.
+ *
+ * @license MIT License
+ * @author Caen De Silva
+ * @copyright Copyright (c) 2023 Caen De Silva
+ *
+ * @link https://github.com/caendesilva/MinimaPHP
+ *
+ * @version Minima::VERSION
+ */
+interface Minima
+{
+    const VERSION = 'v0.1.0-dev';
+}
+
+interface Console
+{
+    const INPUT = STDIN;
+    const OUTPUT = STDOUT;
+}
+
+interface ANSI extends ANSI_EXT, XML_ANSI
+{
+    const BLACK = "\033[30m";
+    const RED = "\033[31m";
+    const GREEN = "\033[32m";
+    const YELLOW = "\033[33m";
+    const BLUE = "\033[34m";
+    const MAGENTA = "\033[35m";
+    const CYAN = "\033[36m";
+    const WHITE = "\033[37m";
+    const GRAY = "\033[90m"; // (Bright Black)
+    const RESET = "\033[0m";
+}
+
+interface ANSI_EXT
+{
+    const BRIGHT_RED = "\033[91m";
+    const BRIGHT_GREEN = "\033[92m";
+    const BRIGHT_YELLOW = "\033[93m";
+    const BRIGHT_BLUE = "\033[94m";
+    const BRIGHT_MAGENTA = "\033[95m";
+    const BRIGHT_CYAN = "\033[96m";
+    const BRIGHT_WHITE = "\033[97m";
+}
+
+interface XML_ANSI
+{
+    const INFO = ANSI::GREEN;
+    const WARNING = ANSI::YELLOW;
+    const ERROR = ANSI::RED;
+    const COMMENT = ANSI::GRAY;
+    const RESET = ANSI::RESET;
+}
+
+trait InteractsWithIO
+{
+    public function write(string $string): void
+    {
+        Output::write($string);
+    }
+
+    public function line(string $message = ''): void
+    {
+        Output::write($message . "\n");
+    }
+
+    public function info(string $message): void
+    {
+        $this->line(XML_ANSI::INFO . $message . ANSI::RESET);
+    }
+
+    public function warning(string $message): void
+    {
+        $this->line(XML_ANSI::WARNING . $message . ANSI::RESET);
+    }
+
+    public function error(string $message): void
+    {
+        $this->line(XML_ANSI::ERROR . $message . ANSI::RESET);
+    }
+
+    public function formatted(string $message, bool $newLine = true): void
+    {
+        $startTags = [
+            '<info>' => XML_ANSI::INFO,
+            '<warning>' => XML_ANSI::WARNING,
+            '<error>' => XML_ANSI::ERROR,
+            '<comment>' => XML_ANSI::COMMENT,
+            '<reset>' => XML_ANSI::RESET,
+
+            '<red>' => ANSI::RED,
+            '<green>' => ANSI::GREEN,
+            '<blue>' => ANSI::BLUE,
+            '<yellow>' => ANSI::YELLOW,
+            '<magenta>' => ANSI::MAGENTA,
+            '<cyan>' => ANSI::CYAN,
+        ];
+
+        $endTags = [
+            '</info>' => XML_ANSI::RESET,
+            '</warning>' => XML_ANSI::RESET,
+            '</error>' => XML_ANSI::RESET,
+            '</comment>' => XML_ANSI::RESET,
+            '</reset>' => XML_ANSI::RESET,
+            '</>' => XML_ANSI::RESET,
+
+            '</red>' => ANSI::RESET,
+            '</green>' => ANSI::RESET,
+            '</blue>' => ANSI::RESET,
+            '</yellow>' => ANSI::RESET,
+            '</magenta>' => ANSI::RESET,
+            '</cyan>' => ANSI::RESET,
+        ];
+
+        $formatted = str_replace(array_keys($startTags), array_values($startTags), $message);
+        $formatted = str_replace(array_keys($endTags), array_values($endTags), $formatted);
+
+        if ($newLine) {
+            $this->line($formatted);
+        } else {
+            $this->write($formatted);
+        }
+    }
+
+    /** @example $this->line('Hello ' . $this->ask('Name')); */
+    public function ask(string $question, string $default = ''): string
+    {
+        return Input::readline(ANSI::YELLOW . "$question: " . ANSI::RESET) ?: $default;
+    }
+}
+
+trait AccessesArguments
+{
+    protected function options(): array
+    {
+        return $this->options;
+    }
+
+    protected function arguments(): array
+    {
+        return $this->arguments;
+    }
+
+    protected function hasOption(string $name): bool
+    {
+        return isset($this->options[$name]);
+    }
+
+    protected function hasArgument(string $name): bool
+    {
+        return isset($this->arguments[$name]) || isset(array_flip(array_values($this->arguments))[$name]);
+    }
+
+    protected function getOption(string $name, mixed $default = null): mixed
+    {
+        return $this->options[$name] ?? $default;
+    }
+
+    protected function getArgument(string $name, mixed $default = null): mixed
+    {
+        return $this->arguments[$name] ?? $this->getArgumentByValue($name) ?? $default;
+    }
+
+    private function getArgumentByValue(string $value): ?string
+    {
+        $index = array_flip(array_values($this->arguments))[$value] ?? null;
+
+        return $this->arguments[$index] ?? null;
+    }
+
+    private static function parseOptions(array $options): array
+    {
+        $formatted = [];
+        foreach ($options as $index => $option) {
+            $option = ltrim($option, '-');
+            if (str_contains($option, '=')) {
+                $parts = explode('=', $option);
+                $formatted[$parts[0]] = $parts[1];
+            } else {
+                $formatted[$option] = true;
+            }
+        }
+
+        return $formatted;
+    }
+
+    private static function parseArguments(array $arguments): array
+    {
+        $formatted = [];
+        foreach ($arguments as $index => $argument) {
+            if (str_contains($argument, '=')) {
+                $parts = explode('=', $argument);
+                $formatted[$parts[0]] = $parts[1];
+            } else {
+                $formatted[$index] = $argument;
+            }
+        }
+
+        return $formatted;
+    }
+
+    private static function parseCommandArguments(): array
+    {
+        global $argc;
+        global $argv;
+
+        $options = [];
+        $arguments = [];
+
+        for ($i = 1; $i < $argc; $i++) {
+            if (str_starts_with($argv[$i], '-')) {
+                $options[] = $argv[$i];
+            } else {
+                $arguments[] = $argv[$i];
+            }
+        }
+
+        return [self::parseOptions($options), self::parseArguments($arguments)];
+    }
+}
+
+class Output
+{
+    public static function write(string $string): void
+    {
+        file_put_contents('php://output', $string);
+    }
+}
+
+class Input
+{
+    public static function readline(?string $prompt = null): string
+    {
+        return readline($prompt);
+    }
+
+    public static function getline(): string
+    {
+        return trim(fgets(Console::INPUT));
+    }
+}
+
+class Command
+{
+    use InteractsWithIO;
+    use AccessesArguments;
+
+    protected Output $output;
+
+    protected array $options;
+    protected array $arguments;
+
+    protected function __construct()
+    {
+        $this->output = new Output();
+
+        [$this->options, $this->arguments] = $this->parseCommandArguments();
+    }
+
+    public static function main(Closure $logic): int
+    {
+        $command = new static();
+
+        $logic = $logic->bindTo($command, static::class);
+
+        return $logic() ?? 0;
+    }
+}
+
+class Dumper
+{
+    public static int $arrayBreakLevel = 2;
+
+    const INDENT = '  ';
+    const ARRAY_OPEN = ANSI::WHITE . '[' . ANSI::RESET;
+    const ARRAY_CLOSE = ANSI::WHITE . ']' . ANSI::RESET;
+    const STRING_OPEN = ANSI::BLUE . "'" . ANSI::GREEN;
+    const STRING_CLOSE = ANSI::BLUE . "'" . ANSI::RESET;
+    const INTEGER_OPEN = ANSI::YELLOW;
+    const INTEGER_CLOSE = ANSI::RESET;
+    const BOOLEAN_OPEN = ANSI::RED;
+    const BOOLEAN_CLOSE = ANSI::RESET;
+    const OBJECT_OPEN = ANSI::YELLOW;
+    const OBJECT_CLOSE = ANSI::RESET;
+    const NULL = ANSI::RED . 'null' . ANSI::RESET;
+
+    protected int $indentationLevel = 0;
+    protected bool $inOpenArray = false;
+
+    public static function highlight(mixed $data): string
+    {
+        return (new static())->runHighlighter($data);
+    }
+
+    protected function runHighlighter(mixed $data): string
+    {
+        if (is_null($data)) {
+            return $this->null($data);
+        }
+        if (is_string($data)) {
+            return $this->string($data);
+        }
+        if (is_int($data)) {
+            return $this->int($data);
+        }
+        if (is_bool($data)) {
+            return $this->bool($data);
+        }
+        if (is_array($data)) {
+            return $this->array($data);
+        }
+        if (is_object($data)) {
+            return static::OBJECT_OPEN . $data::class . static::OBJECT_CLOSE;
+        }
+
+        return (string)$data;
+    }
+
+    protected function null(null|string $value): string
+    {
+        return static::NULL;
+    }
+
+    protected function string(string $value): string
+    {
+        return static::STRING_OPEN . $value . static::STRING_CLOSE;
+    }
+
+    protected function int(int $value): string
+    {
+        return static::INTEGER_OPEN . $value . static::INTEGER_CLOSE;
+    }
+
+    protected function bool(bool $value): string
+    {
+        return static::BOOLEAN_OPEN . ($value ? 'true' : 'false') . static::BOOLEAN_CLOSE;
+    }
+
+    protected function array(array $array): string
+    {
+        $this->indentationLevel++;
+        if ($this->indentationLevel >= static::$arrayBreakLevel - 1) {
+            $this->inOpenArray = true;
+        }
+        $parts = [];
+        foreach ($array as $key => $value) {
+            if ($this->inOpenArray) {
+                $indent = str_repeat(self::INDENT, $this->indentationLevel);
+            } else {
+                $indent = '';
+            }
+            if (is_int($key)) {
+                $parts[] = $indent . $this->runHighlighter($value);
+            } else {
+                $parts[] = $indent . $this->string($key) . ' => ' . $this->runHighlighter($value);
+            }
+        }
+        if ($this->inOpenArray) {
+            $this->indentationLevel--;
+            $indent = str_repeat(self::INDENT, $this->indentationLevel);
+
+            return static::ARRAY_OPEN . "\n" . implode(",\n", $parts) . "\n$indent" . static::ARRAY_CLOSE;
+        } else {
+            return static::ARRAY_OPEN . '' . implode(', ', $parts) . '' . static::ARRAY_CLOSE;
+        }
+    }
+}
+
+if (!function_exists('main')) {
+    function main(Closure $logic): int
+    {
+        return Command::main($logic);
+    }
+}
+
+if (!function_exists('dump')) {
+    function dump(mixed $value, bool $highlight = false): void
+    {
+        if ($highlight) {
+            echo Dumper::highlight($value) . "\n";
+        } else {
+            var_dump($value);
+        }
+    }
+}
+
+if (!function_exists('dd')) {
+    function dd(mixed $value, bool $highlight = false): never
+    {
+        dump($value, $highlight);
+        exit(1);
+    }
+}
+
+if (!function_exists('task')) {
+    /**
+     * Create a self-contained task that does something, then reports the execution time.
+     * You can bypass all tasks by setting the environment variable SKIP_TASKS to true.
+     * This is great for skipping long tasks when testing your script during coding.
+     *
+     * // Todo add buffer parameter to disable buffering, in case live output is needed?
+     */
+    function task(string $name, callable $task): void
+    {
+        $timeStart = microtime(true);
+
+        global $argv;
+        if (in_array('--skip-tasks', $argv)) {
+            putenv('SKIP_TASKS=true');
+            $setLocation = 'option';
+        }
+
+        Output::write(ANSI::GREEN . 'Running task ' . ANSI::YELLOW . "$name" . ANSI::GREEN . '...' . ANSI::RESET . ' ');
+        if (!getenv('SKIP_TASKS')) {
+            ob_start();
+            $task();
+            $buffer = ob_get_clean();
+            $time = round((microtime(true) - $timeStart) * 1000, 2);
+            Output::write(ANSI::GREEN . 'Done! ' . ANSI::GRAY . "(took {$time}ms)" . " \n" . ANSI::RESET);
+        } else {
+            $setLocation = $setLocation ?? 'environment variable';
+            Output::write(ANSI::YELLOW . 'Skipped ' . ANSI::GRAY . "(as set in $setLocation)\n" . ANSI::RESET);
+        }
+        if (!empty($buffer)) {
+            foreach (explode("\n", trim($buffer)) as $line) {
+                Output::write("  $line\n");
+            }
+        }
+    }
+}
+
+// End MinimaPHP
+
+// Begin Speacher
+
+/**
+ * This file is part of Speacher.
+ *
+ * @license MIT License
+ * @author Caen De Silva
+ * @copyright Copyright (c) 2023 Caen De Silva
+ *
+ * @link https://github.com/caendesilva/Speacher
+ *
+ * @version Speacher::VERSION
+ */
+
+class Speacher extends Command
+{
+    public const VERSION = '0.1.0';
+
+    private Config $config;
+
+    protected function help(): void
+    {
+        $this->formatted('<green>Welcome to Speacher!</green>'.'<yellow> v'.self::VERSION.'</yellow>');
+
+        $this->line();
+        $this->formatted('<blue>Usage:</blue>');
+        $this->formatted('<yellow>  speacher</yellow> [options] [arguments]');
+
+        $this->line();
+        $this->formatted('<blue>Options:</blue>');
+        $this->formatted('<yellow>  -h, --help</yellow>        Display this help message');
+        $this->formatted('<yellow>  -v, --version</yellow>     Display this application version');
+        $this->formatted('<yellow>  -i, --input</yellow>       Specify the input file path');
+        $this->formatted('<yellow>  -o, --output</yellow>      Specify the output file path');
+        $this->formatted('<yellow>      --voice</yellow>       Specify the voice to use');
+        $this->formatted('<yellow>      --model</yellow>       Specify the model to use');
+        $this->formatted('<yellow>      --key</yellow>         Specify the OpenAI API key for this call');
+        $this->formatted('<yellow>      --set-key</yellow>     Set the OpenAI API key in the config');
+        $this->formatted('<yellow>      --edit-config</yellow> Edit the global configuration file');
+    }
+
+    protected function debug(): void
+    {
+        $this->loadConfig();
+
+        $this->line('Printing debug info:');
+        $this->line('  - Config path: ' . $this->config->getConfigPath());
+    }
+
+    protected function handleApiCall(string $input, ?string $output = null, string $voice = 'alloy', string $model = 'tts-1'): void
+    {
+        $this->loadConfig();
+
+        $key = $this->getKey();
+
+        $optionVoice = $this->getOption('v') ?? $this->getOption('voice') ?? $this->config->voice ?? null;
+        $optionModel = $this->getOption('m') ?? $this->getOption('model') ?? $this->config->model ?? null;
+
+        $voice = $optionVoice ?? $voice;
+        $model = $optionModel ?? $model;
+
+        $format = $this->config->format ?? 'mp3';
+
+        $curl = curl_init();
+        $url = 'https://api.openai.com/v1/audio/speech';
+        $headers = [
+            'Authorization: Bearer ' . $key,
+            'Content-Type: application/json',
+        ];
+        $data = [
+            'model' => $model,
+            'input' => $input,
+            'voice' => $voice,
+            'response_format' => $format,
+        ];
+        $data = json_encode($data);
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => $headers,
+        ]);
+        $this->info('Making API call...');
+        $response = curl_exec($curl);
+        $error = curl_error($curl);
+        $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($error) {
+            throw new RuntimeException('Failed to make API call: ' . $error);
+        }
+        if ($code !== 200) {
+            throw new RuntimeException('Failed to make API call: <reset>'.trim($response).'</reset>');
+        }
+
+        if (!$output) {
+            $output = 'speacher-'.time().'.'.$format;
+        }
+        if (!str_ends_with($output, '.'.$format)) {
+            $output .= '.'.$format;
+        }
+
+        file_put_contents($output, $response);
+        $this->formatted('<green>Saved output to</green> <yellow>'.$output.'</yellow>');
+    }
+
+    private function getKey(): string
+    {
+        $key = $this->getOption('key') ?? $this->config['key'];
+
+        if (!$key) {
+            throw new BadMethodCallException("No API key found.\nPlease set the key using the `--set-key` command, or use the `--key` option.");
+        }
+        return $key;
+    }
+
+    private function setKey(string $key): void
+    {
+        $this->loadConfig();
+        $this->config['key'] = $key;
+        $this->config->save();
+    }
+
+    private function loadConfig(): void
+    {
+        if (!isset($this->config)) {
+            $this->config = new Config();
+            $this->config->load();
+        }
+    }
+}
+
+class Config extends ArrayObject
+{
+    public ?string $key = null;
+    public string $voice = 'alloy';
+    public string $model = 'tts-1';
+    public string $format = 'mp3';
+
+    public function __construct(object|array $array = [], int $flags = 0, string $iteratorClass = "ArrayIterator")
+    {
+        // Use class property defaults as default array
+        $array = array_merge(get_object_vars($this), $array);
+
+        parent::__construct($array, $flags, $iteratorClass);
+    }
+
+    public function getConfigPath(): string
+    {
+        // If on macOS, use ~/Library/Application Support/Speacher
+        // If on Windows, use %APPDATA%/Speacher
+        // If on Linux, use ~/.config/Speacher
+        // If on other, use ~/.Speacher
+
+        $path = match (PHP_OS_FAMILY) {
+            'Darwin' => $_SERVER['HOME'] . '/Library/Application Support/Speacher',
+            'Windows' => $_SERVER['APPDATA'] . '/Speacher',
+            'Linux' => $_SERVER['HOME'] . '/.config/Speacher',
+            default => $_SERVER['HOME'] . '/.Speacher',
+        };
+
+        $file = $path . '/config.json';
+        if (!file_exists($file)) {
+            if (!is_dir($path)) {
+                mkdir($path, 0700, true);
+            }
+            file_put_contents($file, $this->toJson());
+        }
+
+        return $file;
+    }
+
+    public function load(): void
+    {
+        $file = $this->getConfigPath();
+        $data = json_decode(file_get_contents($file), true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new RuntimeException('Failed to load config file: ' . json_last_error_msg());
+        }
+        $this->exchangeArray($data);
+        foreach ($data as $key => $value) {
+            $this->$key = $value;
+        }
+    }
+
+    public function save(): void
+    {
+        $file = $this->getConfigPath();
+        file_put_contents($file, $this->toJson());
+    }
+
+    public function toJson(): string
+    {
+        return json_encode($this->getArrayCopy(), JSON_PRETTY_PRINT);
+    }
+}
+
+Speacher::main(function (): int {
+    /** @var Speacher $this */
+    if ((!count($this->arguments) && !count($this->options)) || $this->hasOption('help') || $this->hasOption('h')) {
+        return $this->help() ?? 0;
+    }
+
+    if ($this->hasOption('debug')) {
+        return $this->debug() ?? 0;
+    }
+
+    if ($this->hasOption('version') || $this->hasOption('v')) {
+        $this->info('Speacher v'.Speacher::VERSION);
+        return 0;
+    }
+
+    if ($this->hasOption('set-key')) {
+        $key = $this->getOption('set-key');
+        if (!is_string($key) || empty($key)) {
+            $key = $this->ask('Please enter your API key');
+        }
+        if (empty($key)) {
+            $this->error('Please specify a valid API key.');
+            return 1;
+        }
+        $this->setKey($key);
+        $this->info('API key set.');
+        return 0;
+    }
+
+    if ($this->hasOption('edit-config')) {
+        $this->loadConfig();
+        $file = $this->config->getConfigPath();
+        $this->info('Opening config file in editor: ' . $file);
+        passthru('open'. ' ' . escapeshellarg($file));
+        return 0;
+    }
+
+    $input = $this->getOption('input') ?? $this->getOption('i');
+    $output = $this->getOption('output') ?? $this->getOption('o');
+
+    if ($input) {
+        $input = file_get_contents($input);
+    } else {
+        $input = $this->arguments[0] ?? null;
+    }
+    if (!$input) {
+        $this->error('Please specify an input string or file.');
+        return 1;
+    }
+
+    try {
+        $this->handleApiCall($input, $output);
+    } catch (Throwable $exception) {
+        $this->formatted("<red>Something went wrong:</red> <yellow>{$exception->getMessage()}</yellow>");
+        return 1;
+    }
+
+    return 0;
+});
