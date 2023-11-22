@@ -22,10 +22,22 @@ jobs:
           mv README.md _pages/index.md 
           rm -rf !'_pages'
 
+      - name: Transform index page
+        run: php -r '$search = "https://github.com/caendesilva/Speacher/assets/95144705/043e5be4-34ee-4389-ade0-cf40b46d01e0";
+          $replace = "<video controls=\"\" controlsList=\"nodownload\" preload=\"auto\" poster=\"https://raw.githubusercontent.com/caendesilva/Speacher/main/.github/examples/Thumbnail.png\">\n<source src=\"https://raw.githubusercontent.com/caendesilva/Speacher/main/.github/examples/Speacher%20Promo.mp4\">\n<track src=\"media/captions.vtt\" label=\"English\" kind=\"captions\" srclang=\"en-uk\" default>\n</video>";
+          file_put_contents("_pages/index.md", str_replace($search, $replace, file_get_contents("_pages/index.md")));
+          echo "Replacement completed successfully!\n";'
+
+      - name: Proxy captions
+        run: |
+          mkdir _media
+          curl -o _media/captions.vtt https://cdn.desilva.se/media/speacher/promo.vtt
+
       - name: Setup Hyde.yml
         run: |
           echo 'name: Speacher' >> hyde.yml
           echo 'load_app_styles_from_cdn: true' >> hyde.yml
+          echo 'media_extensions: ["mp4", "vtt"]' >> hyde.yml
           # Highlight.js
           echo "footer: '<div>Site proudly built with <a href=\"https://github.com/hydephp/hyde\">HydePHP</a> 🎩</div><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.7.0/build/styles/atom-one-dark.min.css\"> <script src=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.7.0/build/highlight.min.js\"></script> <script>hljs.highlightAll();</script> <style>.prose :where(pre) { background-color: #282c34; } </style> <style>pre code.hljs { padding: 0; }</style>'" >> hyde.yml
 
