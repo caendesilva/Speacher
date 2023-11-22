@@ -33,7 +33,7 @@ https://github.com/caendesilva/Speacher/assets/95144705/043e5be4-34ee-4389-ade0-
 First, download the `speacher` file and make it executable:
 
 ```bash
-curl https://github.com/caendesilva/speacher/releases/latest/download/speacher -o speacher
+curl -L https://github.com/caendesilva/speacher/releases/latest/download/speacher -o speacher
 chmod +x speacher
 sudo mv speacher /usr/local/bin/speacher
 ```
