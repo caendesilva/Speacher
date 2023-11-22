@@ -1,5 +1,11 @@
 # Speacher - Easy CLI OpenAI Text-to-Speech
 
+<div>
+<img src="https://img.shields.io/badge/php-8.1-blue" style="display: inline;" alt="">
+<img src="https://img.shields.io/github/license/caendesilva/speacher" style="display: inline;" alt="">
+<img src="https://img.shields.io/github/downloads/caendesilva/speacher/total.svg" style="display: inline;" alt="">
+</div>
+
 ## Overview
 
 Speacher is a command-line interface (CLI) application written in PHP that enables you to leverage the 
