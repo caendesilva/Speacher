@@ -545,7 +545,21 @@ class Speacher extends Command
         }
 
         file_put_contents($output, $response);
-        $this->formatted('<green>Done! Saved output to</green> <yellow>'.$output.'</yellow>');
+
+        $estimatedCost = '$'.number_format($this->estimateCost($input, $model), 5);
+        $this->formatted('<green>Done! Saved output to</green> <yellow>'.$output.'</yellow>' . ANSI::GRAY." (~$estimatedCost)".ANSI::RESET);
+    }
+
+    protected function estimateCost(string $input, string $model): float
+    {
+        // OpenAI API pricing: (as of Nov 2023)
+        // TTS	    $0.015 / 1K characters
+        // TTS HD	$0.030 / 1K characters
+
+        $characters = strlen($input);
+        $modifier = $model === 'tts-1' ? 0.015 : 0.030;
+
+        return $characters * $modifier / 1000;
     }
 
     private function getKey(): string
