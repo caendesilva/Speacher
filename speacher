@@ -521,16 +521,19 @@ class Speacher extends Command
             CURLOPT_POSTFIELDS => $data,
             CURLOPT_HTTPHEADER => $headers,
         ]);
-        $this->info('Making API call...');
+        $this->write(ANSI::BLUE . 'Making API call...' . ANSI::RESET . ' ');
+
         $response = curl_exec($curl);
         $error = curl_error($curl);
         $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
 
         if ($error) {
+            $this->line();
             throw new RuntimeException('Failed to make API call: ' . $error);
         }
         if ($code !== 200) {
+            $this->line();
             throw new RuntimeException('Failed to make API call: <reset>'.trim($response).'</reset>');
         }
 
@@ -542,7 +545,7 @@ class Speacher extends Command
         }
 
         file_put_contents($output, $response);
-        $this->formatted('<green>Saved output to</green> <yellow>'.$output.'</yellow>');
+        $this->formatted('<green>Done! Saved output to</green> <yellow>'.$output.'</yellow>');
     }
 
     private function getKey(): string
