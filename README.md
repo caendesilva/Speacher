@@ -81,6 +81,7 @@ These are the available options for the `speacher` command:
 | --key         | Specify the OpenAI API key for this call |
 | --set-key     | Set the OpenAI API key in the config     |
 | --edit-config | Edit the global configuration file       |
+| --play        | Play the generation audio (macOS only)   |
 
 ### Configuration
 
