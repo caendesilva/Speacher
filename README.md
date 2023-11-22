@@ -4,7 +4,9 @@
 
 Speacher is a command-line interface (CLI) application written in PHP that enables you to leverage the 
 [OpenAI Text-to-Speech API](https://platform.openai.com/docs/guides/text-to-speech) to convert text
-into stunningly realistic speech right from the command line, without effort.
+into stunningly realistic speech right from the command line, without effort. Listen below!
+
+https://github.com/caendesilva/Speacher/assets/95144705/7578939a-1e53-41a8-9a5c-4d4ec19e52d0
 
 ### Features
 
