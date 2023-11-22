@@ -454,7 +454,7 @@ if (!function_exists('task')) {
 
 class Speacher extends Command
 {
-    public const VERSION = '0.2.1';
+    public const VERSION = '0.3.0';
 
     private Config $config;
 
@@ -477,6 +477,9 @@ class Speacher extends Command
         $this->formatted('<yellow>      --key</yellow>         Specify the OpenAI API key for this call');
         $this->formatted('<yellow>      --set-key</yellow>     Set the OpenAI API key in the config');
         $this->formatted('<yellow>      --edit-config</yellow> Edit the global configuration file');
+        if (PHP_OS_FAMILY === 'Darwin') {
+            $this->formatted('<yellow>      --play</yellow>        Play the generated output file');
+        }
     }
 
     protected function debug(): void
@@ -548,6 +551,10 @@ class Speacher extends Command
 
         $estimatedCost = '$'.number_format($this->estimateCost($input, $model), 5);
         $this->formatted('<green>Done! Saved output to</green> <yellow>'.$output.'</yellow>' . ANSI::GRAY." (~$estimatedCost)".ANSI::RESET);
+
+        if ($this->getOption('play') && PHP_OS_FAMILY === 'Darwin') {
+            shell_exec('afplay '.escapeshellarg($output));
+        }
     }
 
     protected function estimateCost(string $input, string $model): float
