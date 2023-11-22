@@ -73,6 +73,24 @@ These are the available options for the `speacher` command:
 | --set-key     | Set the OpenAI API key in the config     |
 | --edit-config | Edit the global configuration file       |
 
+### Configuration
+
+You can also edit the global configuration file to set the default options for the `speacher` command. Open the file using the `--edit-config` option:
+
+```bash
+speacher --edit-config
+```
+
+The default options are:
+
+```json
+{
+    "key": "null",
+    "voice": "alloy",
+    "model": "tts-1",
+    "format": "mp3"
+}
+```
 
 ## Information
 
